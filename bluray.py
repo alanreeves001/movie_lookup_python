@@ -70,7 +70,7 @@ title_element_multiple = '.detailLink'
 title_element_single = 'div.text-p.INITIAL_TITLE_SRCH'
 pubdate_element = '.highlightMe.PUBDATE'
 
-file_path = "//192.168.1.101/alan/Coding/Python scripts/"
+file_path = "//192.168.1.101/alan/Coding/Python scripts/Movie lookup/"
 
 output_file = open(file_path + "movie-links.htm", "w") # w for write, a for append
 #output_file_debug = open(file_path + "debug.txt", "w", encoding="utf-8")
