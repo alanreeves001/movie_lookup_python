@@ -1,5 +1,5 @@
 #! python 3
-# blu-search.py
+# bluray.py
 
 import requests
 import csv
@@ -11,7 +11,7 @@ import re
 def FormatTitle(unformatted):
 
 	# removes all punctuation
-	formatted = unformatted.translate(str.maketrans('', '', string.punctuation))
+	formatted = str(unformatted).translate(str.maketrans('', '', string.punctuation))
 	
 	# removes any extra spaces
 	formatted = " ".join(formatted.split())
@@ -35,16 +35,17 @@ def GetTitleFromResult(result):
 	return title
 
 def GetMediaFromResult(result):
+	# get any characters after [ to the end
 	return result[result.find(" ["):].title()
 
-def GetSearchPageLink():
+def GetSearchPageLink(parameter, item_format):
 
-	search_page_link = "%s%s%s" % ('https://mobi.ent.sirsi.net/client/en_US/default/search/results?qu=', parameter.replace(' ', '+'), '+' + item_format + '&te=&te=ILS')
+	search_page_link = "%s%s%s" % (SEARCH_URL, parameter.replace(' ', '+'), '+' + item_format + SEARCH_URL_SUFFIX)
 
 	return search_page_link
 
 def GetPubDate(result):
-	pubdate = result.find_all('div', {'class': ['displayElementText text-p highlightMe PUBDATE']})
+	pubdate = result.find_all('div', {'class': [PUBDATE_ELEMENT_RESULTS]})
 	if pubdate:
 		pubdate = " (" + pubdate[0].text.strip() + ")"
 	else:
@@ -58,6 +59,16 @@ def GetPageContents(response):
 
 # --------------------------------------------------------------
 
+# CONSTANTS
+SEARCH_URL = 'https://mobi.ent.sirsi.net/client/en_US/default/search/results?qu='
+SEARCH_URL_SUFFIX = '&te=&te=ILS'
+FILE_PATH = "./"
+TITLE_ELEMENT_MULTIPLE = '.results_bio'
+TITLE_ELEMENT_SINGLE = 'div.text-p.INITIAL_TITLE_SRCH'
+PUBDATE_ELEMENT_RESULTS ='displayElementText text-p highlightMe PUBDATE'
+PUBDATE_ELEMENT_PAGE = '.text-p.PUBLICATION_INFO'
+
+# Variables
 now = datetime.datetime.now()
 page_response_timeout = 15
 tab = "&nbsp;&nbsp;&nbsp;"
@@ -66,27 +77,22 @@ not_found = " not found"
 found = False
 result_prefix = ''
 result_suffix = ''
-title_element_multiple = '.detailLink'
-title_element_single = 'div.text-p.INITIAL_TITLE_SRCH'
-pubdate_element = '.highlightMe.PUBDATE'
+item_formats_list = ['blu','dvd']
 
-file_path = "//192.168.1.101/alan/Coding/Python scripts/Movie lookup/"
-
-output_file = open(file_path + "movie-links.htm", "w") # w for write, a for append
-#output_file_debug = open(file_path + "debug.txt", "w", encoding="utf-8")
+output_file = open(FILE_PATH + "movie-links.htm", "w") # w for write, a for append
+#output_file_debug = open(FILE_PATH + "debug.txt", "w", encoding="utf-8")
 
 html_header = "<html>\n   <head>\n      <title>Mobile Public Library Python automated Bluray and DVD lookup</title>\n   </head>\n   <body style='line-height: 1.5em'>\n"
 
-output_file.write(html_header + "   " + now.strftime("%m/%d/%Y") + "<br>\n")
+output_file.write(html_header + "   " + now.strftime("%m/%d/%Y @ %I:%M %p ") + "<br>\n")
 
-input_file = file_path + "movies.csv"
-#input_file = file_path + "movies_test.csv"
+input_file = FILE_PATH + "movies.csv"
+#input_file = FILE_PATH + "movies_test.csv" # Short data file used for testing/debugging
 
 # Open data files and read in CSV data
 data_file = open(input_file)
 data_reader = csv.reader(data_file)
 data = list(data_reader)
-item_formats_list = ['blu','dvd']
 
 # For every user provided data entry from input file
 for row in data:
@@ -105,13 +111,13 @@ for row in data:
 		continue
 	
 	# Remove any [], apostrophes, spaces and convert to Uppercase words (via title())
-	parameter = FormatTitle(str(row))
+	parameter = FormatTitle(row)
 
 	# loop to check for Blu-ray and DVD
 	for item_format in item_formats_list:
 		
-		#Building link to search
-		page_link = GetSearchPageLink()
+		#Building link to search - Uses hard coded link, title (parameter), and item format to generate a search link
+		page_link = GetSearchPageLink(parameter, item_format)
 
 		# getting search response page
 		page_response = requests.get(page_link, timeout=page_response_timeout) # 15s timeout
@@ -124,7 +130,7 @@ for row in data:
 		page_content = GetPageContents(page_response)
 		
 		# select all elements associated with the title of the movie
-		elements = page_content.select('.results_bio') # (title_element_multiple)
+		elements = page_content.select(TITLE_ELEMENT_MULTIPLE)
 		
 		# Displays the current title and format being researched to the terminal
 		print ("Checking " + parameter + " (" + item_format + ")...")
@@ -164,7 +170,7 @@ for row in data:
 								"' target='_blank'>" + web_title + publication_date + "</a>"
 					# if title is found but not at the beginning of the result
 					else:
-						print("try this")
+						print(web_title + " - try this")
 						item_link = "Try this - <a href='https://mobi.ent.sirsi.net" + str(result.find('a')['href']) + \
 								"' target='_blank'>" + web_title + publication_date + "</a>"
 					
@@ -188,7 +194,7 @@ for row in data:
 		#if there is a single result
 		else :
 			# if there is a single result, look over the page contents for the title movie tag
-			element = page_content.select(title_element_single)
+			element = page_content.select(TITLE_ELEMENT_SINGLE)
 
 			# if the title movie tag is found 
 			if (element) :
@@ -196,11 +202,11 @@ for row in data:
 				# compare just the title from the web results to the data title after removing any punctionation marks, etc
 				if(str(element[0].contents)[0:str(element[0].contents).find(" [")].translate(str.maketrans('', '', string.punctuation)).title().find(parameter) >= 0) :
 
-					if not page_content.select(".text-p.PUBLICATION_INFO"):
+					if not page_content.select(PUBDATE_ELEMENT_PAGE):
 						#print("No pub date found")
 						publication_date = ""
 					else:
-						publication_date = " (" + re.search('\d{4}', str(page_content.select(".text-p.PUBLICATION_INFO")))[0] + ")"
+						publication_date = " (" + re.search('\d{4}', str(page_content.select(PUBDATE_ELEMENT_PAGE)))[0] + ")"
 					
 					search_message = item_format + ": " + result_link + " - <a href='" + page_link + "' target='_blank'>" + parameter + publication_date + "</a>"
 					result_prefix = tab + tab + "<strong>"
@@ -221,7 +227,7 @@ for row in data:
 		found = False
 		
 	output_file.write ("<br>\n")
-output_file.write("\n<a href='file:///H:/Coding/Python%20scripts/movie-research.htm'>Movie Research</a><br><br>")
+output_file.write("\n<a href='file:///H:/Coding/Python%20scripts/Movie%20lookup/movie-research.htm'>Movie Research</a><br><br>")
 output_file.write("\nEnd of File\n   </body>\n</html>")
 output_file.close()
 
