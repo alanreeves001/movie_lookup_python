@@ -36,7 +36,7 @@ def GetTitleFromResult(result):
 
 def GetMediaFromResult(result):
 	# get any characters after [ to the end
-	return result[result.find(" ["):].title()
+	return result[result.find(" ["):result.find("]") + 1].title()
 
 def GetSearchPageLink(parameter, item_format):
 	# formats a link to do the initial search for web scraping
@@ -105,8 +105,8 @@ TITLE_ELEMENT_MULTIPLE = '.results_bio'
 TITLE_ELEMENT_SINGLE = 'div.text-p.INITIAL_TITLE_SRCH'
 PUBDATE_ELEMENT_RESULTS ='displayElementText text-p highlightMe PUBDATE'
 PUBDATE_ELEMENT_PAGE = '.text-p.PUBLICATION_INFO'
-#INPUT_DATA = FILE_PATH + "movies.csv"
-INPUT_DATA = FILE_PATH + "movies_test.csv" # Short data file used for testing/debugging
+INPUT_DATA = FILE_PATH + "movies.csv"
+#INPUT_DATA = FILE_PATH + "movies_test.csv" # Short data file used for testing/debugging
 
 # Variables
 now = datetime.datetime.now()
@@ -136,7 +136,6 @@ for row in data:
 	search_message = ''
 	result_prefix = ''
 	result_suffix = '<br>'
-	item_link_prefix = ''
 
 	# Print separation headers for DVD section
 	if str(row).find("DVD--") > 0 :
@@ -153,6 +152,7 @@ for row in data:
 	# loop to check for Blu-ray and DVD
 	for item_format in item_formats_list:
 		publication_date = ""
+		item_link_prefix = ''
 		#Building link to search - Uses hard coded link, title (parameter), and item format to generate a search link
 		page_link = GetSearchPageLink(parameter, item_format)
 
@@ -234,7 +234,7 @@ for row in data:
 				if result_title.find(parameter) >= 0:
 					
 					media_type = GetMediaFromResult(result)
-					
+
 					if not CheckResultForItemFormat(result, item_format):
 						continue
 
