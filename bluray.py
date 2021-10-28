@@ -127,7 +127,7 @@ html_header = "<html>\n   <head>\n      <title>Mobile Public Library Python auto
 
 DataOutput(html_header + "   " + now.strftime("%m/%d/%Y @ %I:%M %p ") + "<br>\n")
 
-# Open data sources and read in data
+# Open data source and read in data
 data = GetDataAsList(INPUT_DATA)
 
 # For every user provided data entry from input file
