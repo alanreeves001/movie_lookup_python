@@ -17,7 +17,7 @@ def FormatTitle(unformatted):
 	formatted = " ".join(formatted.split())
 	
 	# converts to Title (each work capitalized)
-	formatted = formatted.title()
+	formatted = formatted.title().strip()
 
 	# Removes "The" from the data file title
 	if formatted[0:3] == "The":
@@ -39,7 +39,7 @@ def GetMediaFromResult(result):
 	return result[result.find(" ["):].title()
 
 def GetSearchPageLink(parameter, item_format):
-
+	# formats a link to do the initial search for web scraping
 	search_page_link = "%s%s%s" % (SEARCH_URL, parameter.replace(' ', '+'), '+' + item_format + SEARCH_URL_SUFFIX)
 
 	return search_page_link
@@ -54,11 +54,46 @@ def GetPubDateMultiple(data):
 	return pubdate
 
 def GetPubDateSingle(data):
-	return " (" + re.search('\d{4}', str(data.select(PUBDATE_ELEMENT_PAGE)))[0] + ")"
+	
+	if not data.select(PUBDATE_ELEMENT_PAGE):
+						#print("No pub date found")
+		publication_date = ""
+	else:
+		publication_date = " (" + re.search('\d{4}', str(data.select(PUBDATE_ELEMENT_PAGE)))[0] + ")"
+	
+	return publication_date
 
 def GetPageContents(response):
 
 	return BeautifulSoup(response.text, 'html.parser')
+
+def GetDataAsList(data):
+	# Opens data source. Converts data to list. Returns data list
+	
+	data_source = GetDataSource(data)
+	data_list = list(ReadData(data_source))
+	return data_list
+
+def GetDataSource(source):
+	return open(source)
+
+def ReadData(data):
+	return csv.reader(data)
+
+def DataOutput(data):
+	output_file.write(data)
+
+def CheckResultForItemFormat(data, format):
+	# print("CheckresultForItemFormat")
+	if data.title().find("Blu") > 0 and format == "dvd":
+		print("Found blu, looking for dvd")
+		return False
+
+	if data.title().find("Season") > 0:
+		print ("------------- TV ------------------ " + data)
+		return False
+	# print("data title: " + data.title())
+	return True
 
 # --------------------------------------------------------------
 
@@ -70,10 +105,12 @@ TITLE_ELEMENT_MULTIPLE = '.results_bio'
 TITLE_ELEMENT_SINGLE = 'div.text-p.INITIAL_TITLE_SRCH'
 PUBDATE_ELEMENT_RESULTS ='displayElementText text-p highlightMe PUBDATE'
 PUBDATE_ELEMENT_PAGE = '.text-p.PUBLICATION_INFO'
+#INPUT_DATA = FILE_PATH + "movies.csv"
+INPUT_DATA = FILE_PATH + "movies_test.csv" # Short data file used for testing/debugging
 
 # Variables
 now = datetime.datetime.now()
-page_response_timeout = 15
+page_response_timeout = 22
 tab = "&nbsp;&nbsp;&nbsp;"
 search_message = ''
 not_found = " not found"
@@ -88,15 +125,10 @@ output_file = open(FILE_PATH + "movie-links.htm", "w") # w for write, a for appe
 
 html_header = "<html>\n   <head>\n      <title>Mobile Public Library Python automated Bluray and DVD lookup</title>\n   </head>\n   <body style='line-height: 1.5em'>\n"
 
-output_file.write(html_header + "   " + now.strftime("%m/%d/%Y @ %I:%M %p ") + "<br>\n")
+DataOutput(html_header + "   " + now.strftime("%m/%d/%Y @ %I:%M %p ") + "<br>\n")
 
-input_file = FILE_PATH + "movies.csv"
-#input_file = FILE_PATH + "movies_test.csv" # Short data file used for testing/debugging
-
-# Open data files and read in CSV data
-data_file = open(input_file)
-data_reader = csv.reader(data_file)
-data = list(data_reader)
+# Open data sources and read in data
+data = GetDataAsList(INPUT_DATA)
 
 # For every user provided data entry from input file
 for row in data:
@@ -104,10 +136,11 @@ for row in data:
 	search_message = ''
 	result_prefix = ''
 	result_suffix = '<br>'
+	item_link_prefix = ''
 
 	# Print separation headers for DVD section
 	if str(row).find("DVD--") > 0 :
-		output_file.write("----------------------- DVD ----------------------- <br>")
+		DataOutput("----------------------- DVD ----------------------- <br>")
 		continue
 	
 	# skips any title with -- found
@@ -119,7 +152,7 @@ for row in data:
 
 	# loop to check for Blu-ray and DVD
 	for item_format in item_formats_list:
-		
+		publication_date = ""
 		#Building link to search - Uses hard coded link, title (parameter), and item format to generate a search link
 		page_link = GetSearchPageLink(parameter, item_format)
 
@@ -127,8 +160,8 @@ for row in data:
 		page_response = requests.get(page_link, timeout=page_response_timeout) # 15s timeout
 
 		#building link to display in results
-		result_link = "<a href='" + page_link + "' target='_blank'>" + parameter + "</a>"
-		item_link = result_link
+		search_link = "<a href='" + page_link + "' target='_blank'>" + parameter + "</a>"
+		#item_link = search_link
 
 		#parse HTML
 		page_content = GetPageContents(page_response)
@@ -142,92 +175,106 @@ for row in data:
 		# if multiple results are found 
 		if elements :			
 			
-			for result in elements:				
-				
-				result_title = result.find('a')['title']
-				
-				# gets the title part of the HTML tag (part before [])
-				web_title = FormatTitle(GetTitleFromResult(result_title))
-	
-				# compare the title from the web results to the data title
-				if web_title.find(parameter) >= 0:
-					
-					media_type = GetMediaFromResult(result_title)
-					
-					if media_type.title().find("Blu") > 0 and item_format == "dvd":
-						#print ("found bluray, looking for DVD")
-						continue
+			for item in elements:				
 
-					if media_type.find("Season") > 0:
-						print ("------------- TV ------------------ " + parameter)
-						continue
+				result = item.find('a')['title']
+
+				# gets the title part of the HTML tag (part before [])
+				result_title = FormatTitle(GetTitleFromResult(result))
+
+				# compare the title from the web results to the data title
+				if result_title.find(parameter) >= 0:
 					
-					publication_date = GetPubDateMultiple(result)
+					media_type = GetMediaFromResult(result)
+					
+					if not CheckResultForItemFormat(result, item_format):
+						continue
 
 					# if title is not found at the beginning of the web result
-					if web_title.find(parameter,0) != 0:
-						print("Try this: " + web_title + " for this: " + parameter)
-						item_link_prefix = "Try this - "
-						
-					item_link = item_link_prefix + "<a href='https://mobi.ent.sirsi.net" + str(result.find('a')['href']) + \
-								"' target='_blank'>" + web_title + publication_date + "</a>"
+					if result_title.find(parameter,0) != 0 or len(result_title) > len(parameter):
+						print("Try this: " + result_title + " for this: " + parameter)
+						item_link_prefix = " - Try this"
+
+					publication_date = GetPubDateMultiple(item)
+
+					page_link = "https://mobi.ent.sirsi.net" + str(item.find('a')['href'])
+
+					result_link = " - <a href='" + page_link + "' target='_blank'>" + result_title + publication_date + "</a>"
 
 					# if the result is a DVD and the script is looking for DVD, set item link to search result link
 					if media_type=="[Videorecording]" and item_format=="dvd":
 						print("DVD")
-						item_link = result_link
+						result_link = search_link 
 
-					search_message =  item_format + ": " + result_link + " - " + item_link
+					found = True
+
+					search_message = search_link + item_link_prefix + result_link
+
 					result_prefix = tab + tab + "<strong>"
 					result_suffix = "</strong><br>"
-					found = True
-					publication_date = ""
-					item_link_prefix = ""
-					
-					# break
-
+					break	# breaks after first found close result. Comment out to find last close result
 
 			if not found:
-				search_message = item_format + ": " + result_link + not_found
+				search_message = search_link + not_found
 				result_prefix = ""
 		
-		#if there is a single result
+		#if there is a single result (no elements)
 		else :
 			# if there is a single result, look over the page contents for the title movie tag
-			element = page_content.select(TITLE_ELEMENT_SINGLE)
-
-			if (element) :
-				title_location_in_tag = FormatTitle(GetTitleFromResult(element[0].contents)).find(parameter)
+			item = page_content
+			result = item.select(TITLE_ELEMENT_SINGLE)
+			#print("single")
+			if (result) :
+				result = str(result[0].contents)
 				
-				# compare just the title from the web results to the data title after removing any punctionation marks, etc
-				if(title_location_in_tag >= 0) :
+				# gets the title part of the HTML tag (part before [])
+				result_title = FormatTitle(GetTitleFromResult(result))
+				
+				# compare the title from the web results to the data title
+				if result_title.find(parameter) >= 0:
 					
-					if not page_content.select(PUBDATE_ELEMENT_PAGE):
-						#print("No pub date found")
-						publication_date = ""
-					else:
-						publication_date = GetPubDateSingle(page_content)
+					media_type = GetMediaFromResult(result)
 					
-					search_message = item_format + ": " + result_link + " - <a href='" + page_link + "' target='_blank'>" + parameter + publication_date + "</a>"
+					if not CheckResultForItemFormat(result, item_format):
+						continue
+
+					if result_title.find(parameter,0) != 0 or len(result_title) > len(parameter):
+						print("Try this: " + result_title + " for this: " + parameter)
+						item_link_prefix = " - Try this"
+
+					publication_date = GetPubDateSingle(item)
+
+					# page_link = page_link
+
+					result_link = " - <a href='" + page_link + "' target='_blank'>" + result_title + publication_date + "</a>"
+					
+					found = True
+
+					search_message = search_link + item_link_prefix + result_link
+
+					# exactly the same
 					result_prefix = tab + tab + "<strong>"
 					result_suffix = "</strong><br>"
-				
+					# exactly the same
+
 				#if single result is found but the title is not found
 				else :
-					search_message = item_format + ": " + result_link + not_found
+					search_message = search_link + not_found
 					result_prefix = ""
 			
 			#if no results are found
 			else :
-				search_message = item_format + ": " + result_link + not_found 
+				search_message = search_link + not_found 
 				result_prefix = ""
 				#result_suffix = "</strong><br>"
-		
-		output_file.write ("   " + tab + result_prefix + search_message + result_suffix + '\n')
+
+		DataOutput("   " + tab + result_prefix + item_format + ": " + search_message + result_suffix + '\n')
 		found = False
-		
-	output_file.write ("<br>\n")
-output_file.write("\n<a href='file:///H:/Coding/Python%20scripts/Movie%20lookup/movie-research.htm'>Movie Research</a><br><br>")
-output_file.write("\nEnd of File\n   </body>\n</html>")
+		# end - for item_format in item_formats_list:	
+
+	DataOutput("<br>\n")
+
+DataOutput("\n<a href='file:///H:/Coding/Python%20scripts/Movie%20lookup/movie-research.htm'>Movie Research</a><br><br>")
+DataOutput("\nEnd of File\n   </body>\n</html>")
 output_file.close()
 
