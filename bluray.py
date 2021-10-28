@@ -32,7 +32,7 @@ def GetTitleFromResult(result):
 
 	title = re.sub(regex, "", str(result))
 
-	return title
+	return title.strip()
 
 def GetMediaFromResult(result):
 	# get any characters after [ to the end
@@ -44,14 +44,17 @@ def GetSearchPageLink(parameter, item_format):
 
 	return search_page_link
 
-def GetPubDate(result):
-	pubdate = result.find_all('div', {'class': [PUBDATE_ELEMENT_RESULTS]})
+def GetPubDateMultiple(data):
+	pubdate = data.find_all('div', {'class': [PUBDATE_ELEMENT_RESULTS]})
 	if pubdate:
 		pubdate = " (" + pubdate[0].text.strip() + ")"
 	else:
 		pubdate = ""
 	
 	return pubdate
+
+def GetPubDateSingle(data):
+	return " (" + re.search('\d{4}', str(data.select(PUBDATE_ELEMENT_PAGE)))[0] + ")"
 
 def GetPageContents(response):
 
@@ -78,6 +81,7 @@ found = False
 result_prefix = ''
 result_suffix = ''
 item_formats_list = ['blu','dvd']
+item_link_prefix = ""
 
 output_file = open(FILE_PATH + "movie-links.htm", "w") # w for write, a for append
 #output_file_debug = open(FILE_PATH + "debug.txt", "w", encoding="utf-8")
@@ -136,14 +140,10 @@ for row in data:
 		print ("Checking " + parameter + " (" + item_format + ")...")
 
 		# if multiple results are found 
-		if (len(elements) > 0) :			
+		if elements :			
 			
-			publication_date = ""
-			
-			for idx, result in enumerate(elements):				
+			for result in elements:				
 				
-				publication_date = GetPubDate(result)
-
 				result_title = result.find('a')['title']
 				
 				# gets the title part of the HTML tag (part before [])
@@ -162,18 +162,16 @@ for row in data:
 						print ("------------- TV ------------------ " + parameter)
 						continue
 					
-					# if title is found at the beginning of the web result
-					if web_title.find(parameter,0) == 0:
-						# print("found")
-						# print(str(result.find('a')['href']))
-						item_link = "<a href='https://mobi.ent.sirsi.net" + str(result.find('a')['href']) + \
+					publication_date = GetPubDateMultiple(result)
+
+					# if title is not found at the beginning of the web result
+					if web_title.find(parameter,0) != 0:
+						print("Try this: " + web_title + " for this: " + parameter)
+						item_link_prefix = "Try this - "
+						
+					item_link = item_link_prefix + "<a href='https://mobi.ent.sirsi.net" + str(result.find('a')['href']) + \
 								"' target='_blank'>" + web_title + publication_date + "</a>"
-					# if title is found but not at the beginning of the result
-					else:
-						print(web_title + " - try this")
-						item_link = "Try this - <a href='https://mobi.ent.sirsi.net" + str(result.find('a')['href']) + \
-								"' target='_blank'>" + web_title + publication_date + "</a>"
-					
+
 					# if the result is a DVD and the script is looking for DVD, set item link to search result link
 					if media_type=="[Videorecording]" and item_format=="dvd":
 						print("DVD")
@@ -183,6 +181,8 @@ for row in data:
 					result_prefix = tab + tab + "<strong>"
 					result_suffix = "</strong><br>"
 					found = True
+					publication_date = ""
+					item_link_prefix = ""
 					
 					# break
 
@@ -196,17 +196,17 @@ for row in data:
 			# if there is a single result, look over the page contents for the title movie tag
 			element = page_content.select(TITLE_ELEMENT_SINGLE)
 
-			# if the title movie tag is found 
 			if (element) :
-
+				title_location_in_tag = FormatTitle(GetTitleFromResult(element[0].contents)).find(parameter)
+				
 				# compare just the title from the web results to the data title after removing any punctionation marks, etc
-				if(str(element[0].contents)[0:str(element[0].contents).find(" [")].translate(str.maketrans('', '', string.punctuation)).title().find(parameter) >= 0) :
-
+				if(title_location_in_tag >= 0) :
+					
 					if not page_content.select(PUBDATE_ELEMENT_PAGE):
 						#print("No pub date found")
 						publication_date = ""
 					else:
-						publication_date = " (" + re.search('\d{4}', str(page_content.select(PUBDATE_ELEMENT_PAGE)))[0] + ")"
+						publication_date = GetPubDateSingle(page_content)
 					
 					search_message = item_format + ": " + result_link + " - <a href='" + page_link + "' target='_blank'>" + parameter + publication_date + "</a>"
 					result_prefix = tab + tab + "<strong>"
