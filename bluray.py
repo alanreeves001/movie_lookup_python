@@ -100,6 +100,7 @@ def CheckResultForItemFormat(data, format):
 # CONSTANTS
 SEARCH_URL = 'https://mobi.ent.sirsi.net/client/en_US/default/search/results?qu='
 SEARCH_URL_SUFFIX = '&te=&te=ILS'
+PAGE_LINK_PREFIX = "https://mobi.ent.sirsi.net"
 FILE_PATH = "./"
 TITLE_ELEMENT_MULTIPLE = '.results_bio'
 TITLE_ELEMENT_SINGLE = 'div.text-p.INITIAL_TITLE_SRCH'
@@ -151,7 +152,7 @@ for row in data:
 
 	# loop to check for Blu-ray and DVD
 	for item_format in item_formats_list:
-		publication_date = ""
+		publication_date = ''
 		item_link_prefix = ''
 		#Building link to search - Uses hard coded link, title (parameter), and item format to generate a search link
 		page_link = GetSearchPageLink(parameter, item_format)
@@ -197,7 +198,7 @@ for row in data:
 
 					publication_date = GetPubDateMultiple(item)
 
-					page_link = "https://mobi.ent.sirsi.net" + str(item.find('a')['href'])
+					page_link = PAGE_LINK_PREFIX + str(item.find('a')['href'])
 
 					result_link = " - <a href='" + page_link + "' target='_blank'>" + result_title + publication_date + "</a>"
 
@@ -274,7 +275,7 @@ for row in data:
 
 	DataOutput("<br>\n")
 
-DataOutput("\n<a href='file:///H:/Coding/Python%20scripts/Movie%20lookup/movie-research.htm'>Movie Research</a><br><br>")
+DataOutput("\n<a href='file:///C:/Users/Alan/Documents/movie_lookup_python/movie-research.htm'>Movie Research</a><br><br>")
 DataOutput("\nEnd of File\n   </body>\n</html>")
 output_file.close()
 
