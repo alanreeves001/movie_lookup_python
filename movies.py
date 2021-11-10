@@ -10,6 +10,9 @@ from bs4 import BeautifulSoup
 import string
 import json
 
+from db import db
+
+
 outputFileName = 'movie-research.htm'
 movieListFileName = 'movies.csv'
 
